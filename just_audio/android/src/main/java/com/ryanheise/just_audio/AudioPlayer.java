@@ -52,6 +52,7 @@ import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.Util;
+import androidx.media3.ui.WearUnsuitableOutputPlaybackSuppressionResolverListener;
 import io.flutter.Log;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.EventChannel;
@@ -373,6 +374,19 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             return true;
         }
         return false;
+    }
+
+    @Override
+    public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+        if (Util.isWear(context)) {
+            updatePosition();
+            dataEventChannel.success(mapOf("playing", playWhenReady));
+            broadcastImmediatePlaybackEvent();
+            if (!playWhenReady && playResult != null) {
+                playResult.success(new HashMap<String, Object>());
+                playResult = null;
+            }
+        }
     }
 
     @Override
@@ -842,6 +856,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 return allRenderers;
             };
             ExoPlayer.Builder builder = new ExoPlayer.Builder(context, renderersFactory);
+            if (Util.isWear(context)) {
+                builder.setSuppressPlaybackOnUnsuitableOutput(true);
+            }
             builder.setUseLazyPreparation(useLazyPreparation);
             if (loadControl != null) {
                 builder.setLoadControl(loadControl);
@@ -858,6 +875,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             );
             setAudioSessionId(player.getAudioSessionId());
             player.addListener(this);
+            if (Util.isWear(context)) {
+                player.addListener(new WearUnsuitableOutputPlaybackSuppressionResolverListener(context));
+            }
         }
     }
 
